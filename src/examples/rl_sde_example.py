@@ -16,6 +16,11 @@ from tf_agents.replay_buffers import reverb_utils
 from tf_agents.specs import tensor_spec
 from tf_agents.utils import common
 
+'''
+Ref: tf-agents tutorial
+https://github.com/tensorflow/agents/blob/master/docs/tutorials/6_reinforce_tutorial.ipynb
+'''
+
 
 if __name__ == "__main__":
 

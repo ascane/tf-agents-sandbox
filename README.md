@@ -9,7 +9,7 @@ $ source venv/bin/activate
 $ pip install tf-agents[reverb]
 ```
 
-### Problem shooting
+### Troubleshooting
 
 #### Missing libraries
 https://stackoverflow.com/questions/74956134/could-not-load-dynamic-library-libnvinfer-so-7

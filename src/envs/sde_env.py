@@ -13,6 +13,7 @@ class SimpleSdeEnv(core.Env):
     dt = 0.1
     n = 4
     mu = np.random.uniform(low=0.0, high=1.0, size=(n, 1))
+    # assuming uncorrelated stocks; Cholesky decomposition of positive definite matrix in the future
     sigma = np.random.uniform(low=0.0, high=1.0, size=(n, 1))
     timestep_limit = 100
 
@@ -49,8 +50,9 @@ class SimpleSdeEnv(core.Env):
         self.S += np.matmul(np.diag(np.squeeze(self.mu * self.dt)), self.S) + np.matmul(np.diag(np.squeeze(self.sigma * W)), self.S)
         reward = -np.var(action * self.S - self.S / self.n)
         self.timestep += 1
+        done = self.timestep >= self.timestep_limit
         info = {"timestep": self.timestep, "S": self.S, "W": W, "mu": self.mu, "sigma": self.sigma, "timestep_limit": self.timestep_limit}
-        return self.S.reshape((-1)), reward, self.timestep >= self.timestep_limit, info
+        return self.S.reshape((-1)), reward, done, info
 
     def reset(
         self,
@@ -76,8 +78,6 @@ class SimpleSdeEnv(core.Env):
         Returns:
             observation (object): Observation of the initial state. This will be an element of :attr:`observation_space`
                 (typically a numpy array) and is analogous to the observation returned by :meth:`step`.
-            info (dictionary):  This dictionary contains auxiliary information complementing ``observation``. It should be analogous to
-                the ``info`` returned by :meth:`step`.
         """
         super().reset(seed=seed)
         self.S = np.random.uniform(low=0.0, high=1.0, size=(self.n, 1))
