@@ -10,3 +10,9 @@ register(
     # timestep_limit=6060,
     # reward_threshold=1000
 )
+
+register(
+    id='basket-option-hedging-v0',
+    entry_point='src.envs:BasketOptionHedging',
+    kwargs={"num_stocks" : 5}
+)
