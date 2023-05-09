@@ -142,7 +142,9 @@ class BasketOptionHedging(core.Env):
         reward = 0
         done = False
         if self.timestep >= self.num_steps:
-            reward = -self.multi * self.state[-2] * self.state[-2] + self.constant
+            S = self.stock_price[0, :, -1]
+            portfolio_value = self.state[-2] + np.sum(H * S)
+            reward = -self.multi * portfolio_value * portfolio_value + self.constant 
             done = True
 
         return self.state, reward, done, {}
