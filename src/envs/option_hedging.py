@@ -75,6 +75,7 @@ class BasketOptionHedging(core.Env):
         self.covariance = covariance
         self.mu = mu
         self.ppy = ppy
+        self.dt = 1. / self.ppy
         self.dtype = dtype
         self.price_max = price_max
         self.price_min = price_min
@@ -126,16 +127,17 @@ class BasketOptionHedging(core.Env):
                 of returning two booleans, and will be removed in a future version.
         """
         
-        H = action[:self.num_stocks]
+        H = np.clip(action[:self.num_stocks], self.spot_holding_min, self.spot_holding_max)
         prev_H = self.state[self.num_stocks: 2 * self.num_stocks]
         prev_S = self.state[:self.num_stocks]
 
+        # TODO: clip cash flow
         instantaneous_cash_flow = np.sum((prev_H - H) * prev_S)
         self.state[-2] += instantaneous_cash_flow
         
         self.state[:self.num_stocks] = self.stock_price[0, :, self.timestep + 1]
         self.state[self.num_stocks:2 * self.num_stocks] = H
-        self.state[-1] -= 1. / self.ppy
+        self.state[-1] -= self.dt
 
         self.timestep += 1
 
@@ -157,11 +159,16 @@ class BasketOptionHedging(core.Env):
         
         self.timestep = 0
         self.state = np.zeros(2 * self.num_stocks + 2)
-        self.state[:self.num_stocks] = self.spot_init
-        self.state[-1] = self.num_steps / self.ppy  # time to maturity
-
+        
         self.stock_price = geometric_brownian_motion(self.num_stocks, self.num_steps, 1, self.covariance, self.mu, \
                                                      self.spot_init, self.ppy, self.np_random)
+        self.stock_price = np.clip(self.stock_price, self.price_min, self.price_max)
+        
+        self.state[:self.num_stocks] = self.stock_price[0, :, 0]  # S_0
+        self.state[self.num_stocks:2 * self.num_stocks] = self.spot_init  # H_0
+        # P_0 = -option_price, C_0 = option_price - \Sum H_0 * S_0 to enforce w_0 = 0
+        self.state[-2] = self.option_price - np.sum(self.stock_price[0, :, 0] * self.spot_init) 
+        self.state[-1] = self.num_steps * self.dt  # T_0 time to maturity
         
     def render(self):
         pass
