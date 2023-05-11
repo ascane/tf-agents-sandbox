@@ -7,9 +7,8 @@ if __name__ == "__main__":
     
     env = gym.make('basket-option-hedging-v0')
 
-    env.reset()
-    S0 = env.state
-    num_stocks = env.num_stocks
+    S0 = env.reset()
+    num_stocks = int((S0.shape[0] - 2) / 2)
 
     # step 1: uniform action
     action = np.zeros((num_stocks + 1,))

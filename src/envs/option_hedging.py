@@ -44,7 +44,6 @@ class BasketOptionHedging(core.Env):
         cash_min=-10.0,
         spot_holding_max=2.0,
         spot_holding_min=-2.0,
-        option_price=1.5,
         multi=1000.0,
         constant=1.0,
         seed=1024,
@@ -68,25 +67,24 @@ class BasketOptionHedging(core.Env):
         :param constant: like the advantage in policy gradient algorithm. Add to the reward so it is really rewarded.
         :param seed: random seed
         """
-        self.num_steps = num_steps
-        self.num_stocks = num_stocks
-        self.spot_init = spot_init
-        self.strike = strike
-        self.covariance = covariance
-        self.mu = mu
-        self.ppy = ppy
-        self.dt = 1. / self.ppy
-        self.dtype = dtype
-        self.price_max = price_max
-        self.price_min = price_min
-        self.cash_max = cash_max
-        self.cash_min = cash_min
-        self.spot_holding_max = spot_holding_max
-        self.spot_holding_min = spot_holding_min
-        self.option_price = option_price
-        self.multi = multi
-        self.constant = constant
-        self.np_random = np.random.default_rng(seed)
+        self._num_steps = num_steps
+        self._num_stocks = num_stocks
+        self._spot_init = spot_init
+        self._strike = strike
+        self._covariance = covariance
+        self._mu = mu
+        self._ppy = ppy
+        self._dt = 1. / self._ppy
+        self._dtype = dtype
+        self._price_max = price_max
+        self._price_min = price_min
+        self._cash_max = cash_max
+        self._cash_min = cash_min
+        self._spot_holding_max = spot_holding_max
+        self._spot_holding_min = spot_holding_min
+        self._multi = multi
+        self._constant = constant
+        self._np_random = np.random.default_rng(seed)
 
         obs_low = np.zeros((2 * num_stocks + 2))
         obs_low[:num_stocks] = price_min
@@ -127,29 +125,34 @@ class BasketOptionHedging(core.Env):
                 of returning two booleans, and will be removed in a future version.
         """
         
-        H = np.clip(action[:self.num_stocks], self.spot_holding_min, self.spot_holding_max)
-        prev_H = self.state[self.num_stocks: 2 * self.num_stocks]
-        prev_S = self.state[:self.num_stocks]
+        H = np.clip(action[:self._num_stocks], self._spot_holding_min, self._spot_holding_max)
+        prev_H = self._state[self._num_stocks: 2 * self._num_stocks]
+        prev_S = self._state[:self._num_stocks]
 
-        # TODO: clip cash flow
+        if self._timestep == 0:
+            self._state[-2] = action[-1]
+
+        # cash flow is not clippted
         instantaneous_cash_flow = np.sum((prev_H - H) * prev_S)
-        self.state[-2] += instantaneous_cash_flow
+        self._state[-2] += instantaneous_cash_flow
         
-        self.state[:self.num_stocks] = self.stock_price[0, :, self.timestep + 1]
-        self.state[self.num_stocks:2 * self.num_stocks] = H
-        self.state[-1] -= self.dt
+        self._state[:self._num_stocks] = self._stock_price[0, :, self._timestep + 1]
+        self._state[self._num_stocks:2 * self._num_stocks] = H
+        self._state[-1] -= self._dt
 
-        self.timestep += 1
+        self._timestep += 1
 
         reward = 0
         done = False
-        if self.timestep >= self.num_steps:
-            S = self.stock_price[0, :, -1]
-            portfolio_value = self.state[-2] + np.sum(H * S)
-            reward = -self.multi * portfolio_value * portfolio_value + self.constant 
+        if self._timestep >= self._num_steps:
+            S = self._stock_price[0, :, -1]
+            payoff = np.max([np.mean(S) - self._strike, 0.0])
+            liquidation = np.sum(H * S)
+            cash_liquidation = self._state[-2]
+            reward = -self._multi * (payoff + liquidation + cash_liquidation) ** 2 + self._constant
             done = True
 
-        return self.state, reward, done, {}
+        return np.array(self._state, self._dtype), reward, done, {}
 
     def reset(
         self,
@@ -157,18 +160,18 @@ class BasketOptionHedging(core.Env):
         seed: Optional[int] = None,
         options: Optional[dict] = None):
         
-        self.timestep = 0
-        self.state = np.zeros(2 * self.num_stocks + 2)
+        self._timestep = 0
+        self._state = np.zeros(2 * self._num_stocks + 2)
         
-        self.stock_price = geometric_brownian_motion(self.num_stocks, self.num_steps, 1, self.covariance, self.mu, \
-                                                     self.spot_init, self.ppy, self.np_random)
-        self.stock_price = np.clip(self.stock_price, self.price_min, self.price_max)
+        self._stock_price = geometric_brownian_motion(self._num_stocks, self._num_steps, 1, self._covariance, self._mu, \
+                                                     self._spot_init, self._ppy, self._np_random)
+        self._stock_price = np.clip(self._stock_price, self._price_min, self._price_max)
         
-        self.state[:self.num_stocks] = self.stock_price[0, :, 0]  # S_0
-        self.state[self.num_stocks:2 * self.num_stocks] = self.spot_init  # H_0
-        # P_0 = -option_price, C_0 = option_price - \Sum H_0 * S_0 to enforce w_0 = 0
-        self.state[-2] = self.option_price - np.sum(self.stock_price[0, :, 0] * self.spot_init) 
-        self.state[-1] = self.num_steps * self.dt  # T_0 time to maturity
+        self._state[:self._num_stocks] = self._spot_init # S_0
+        self._state[self._num_stocks:2 * self._num_stocks] = 0  # H_0
+        self._state[-1] = self._num_steps * self._dt  # T_0 time to maturity
+
+        return np.array(self._state, self._dtype)
         
     def render(self):
         pass
