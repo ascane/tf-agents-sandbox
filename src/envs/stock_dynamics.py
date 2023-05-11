@@ -23,14 +23,19 @@ def geometric_brownian_motion(num_stocks, num_steps, num_paths, cov, mu, spot_in
     if isinstance(spot_init, int) or isinstance(spot_init, float):
         spot_init = spot_init * np.ones(num_stocks)
 
-    dW = np_random.multivariate_normal(np.zeros(num_stocks), cov, size=(num_paths, num_steps), method='cholesky')
+    multivar_norm = np_random.multivariate_normal(np.zeros(num_stocks), cov, size=(num_paths, num_steps), method='cholesky')
 
     S = np.zeros((num_paths, num_stocks, num_steps + 1))
     S[:, :, 0] = spot_init
 
     dt = 1.0 / ppy
-    for i_step in range(num_steps):
-        S[:, :, i_step + 1] = S[:, :, i_step] + mu * S[:, :, i_step] * dt + S[:, :, i_step] * dW[:, i_step, :]
+
+    # Ito's lemma
+    for i_step in range(1, num_steps + 1):
+        S[:, :, i_step] = S[:, :, i_step - 1] * np.exp(
+            (np.sqrt(dt) * multivar_norm[:, i_step - 1, :]) + dt * (mu - 0.5 * np.diag(cov))
+        )
+
     return S
 
 if __name__ == "__main__":
