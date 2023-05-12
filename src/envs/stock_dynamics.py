@@ -23,7 +23,10 @@ def geometric_brownian_motion(num_stocks, num_steps, num_paths, cov, mu, spot_in
     if isinstance(spot_init, int) or isinstance(spot_init, float):
         spot_init = spot_init * np.ones(num_stocks)
 
-    multivar_norm = np_random.multivariate_normal(np.zeros(num_stocks), cov, size=(num_paths, num_steps), method='cholesky')
+    if (cov == 0).all():
+        multivar_norm = np.zeros((num_paths, num_steps, num_stocks))
+    else:
+        multivar_norm = np_random.multivariate_normal(np.zeros(num_stocks), cov, size=(num_paths, num_steps), method='cholesky')
 
     S = np.zeros((num_paths, num_stocks, num_steps + 1))
     S[:, :, 0] = spot_init
